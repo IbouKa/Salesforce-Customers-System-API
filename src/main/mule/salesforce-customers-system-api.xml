@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+  xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+  xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+  xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+      http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+      http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+  <!-- GET /customers - Business Logic Flow -->
+  <flow name="get-customers-business-logic" doc:name="get-customers-business-logic">
+    <ee:transform doc:name="Build SOQL Query">
+      <ee:message>
+        <ee:set-payload><![CDATA[%dw 2.0
+output application/java
+var limit = payload.limit as Number default 200
+var offset = payload.offset as Number default 0
+var sfId = payload.sfId default null
+---
+{
+  query: "SELECT Id, FirstName, LastName, PersonEmail, Phone, AccountNumber, TaxId__c, Status__c FROM Contact " ++ 
+         (if (sfId != null) "WHERE Id = '" ++ sfId ++ "' " else "") ++
+         "LIMIT " ++ limit as String ++ " OFFSET " ++ offset as String
+}]]></ee:set-payload>
+      </ee:message>
+    </ee:transform>
+    <try doc:name="Try">
+      <salesforce:query config-ref="Salesforce_Config" doc:name="Query Salesforce Contacts">
+        <salesforce:salesforce-query><![CDATA[#[payload.query]]]></salesforce:salesforce-query>
+      </salesforce:query>
+
+      <ee:transform doc:name="Transform to Customer Response">
+        <ee:message>
+          <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+var records = payload.records default []
+---
+records map ((contact) -> {
+  id: null,
+  globalId: null,
+  externalIds: [{
+    system: "Salesforce",
+    value: contact.Id
+  }],
+  customerNumber: contact.AccountNumber default null,
+  party: {
+    partyType: "Individual",
+    firstName: contact.FirstName default null,
+    lastName: contact.LastName default null,
+    taxId: contact.TaxId__c default null
+  },
+  status: contact.Status__c default "Active"
+})]]></ee:set-payload>
+        </ee:message>
+      </ee:transform>
+
+      <http:response statusCode="200" doc:name="HTTP Response"/>
+      
+      <error-handler>
+        <on-error-propagate type="SALESFORCE:*" enableNotifications="true" logException="true" doc:name="Salesforce Error">
+          <ee:transform doc:name="Transform Error">
+            <ee:message>
+              <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  error: {
+    code: "SALESFORCE_ERROR",
+    message: "An error occurred while querying Salesforce",
+    timestamp: now()
+  }
+}]]></ee:set-payload>
+            </ee:message>
+          </ee:transform>
+          <http:response statusCode="500" doc:name="HTTP Response"/>
+        </on-error-propagate>
+      </error-handler>
+    </try>
+  </flow>
+
+  <!-- POST /customers - Business Logic Flow -->
+  <flow name="upsert-customer-business-logic" doc:name="upsert-customer-business-logic">
+    <ee:transform doc:name="Transform to Salesforce Format">
+      <ee:message>
+        <ee:set-payload><![CDATA[%dw 2.0
+output application/java
+var party = payload.party default {}
+var sfId = payload.externalIds filter ($.system == "Salesforce")[0].value default null
+---
+{
+  sfId: sfId,
+  contact: {
+    FirstName: party.firstName default null,
+    LastName: party.lastName default null,
+    PersonEmail: party.contactPoints filter ($.type == "Email")[0].value default null,
+    Phone: party.contactPoints filter ($.type == "Phone")[0].value default null,
+    AccountNumber: payload.customerNumber default null,
+    TaxId__c: party.taxId default null,
+    Status__c: payload.status default "Active"
+  }
+}]]></ee:set-payload>
+      </ee:message>
+    </ee:transform>
+
+    <try doc:name="Try">
+      <choice doc:name="Upsert Strategy">
+        <when expression="#[vars.payload.sfId != null]">
+          <salesforce:update config-ref="Salesforce_Config" doc:name="Update Contact">
+            <salesforce:salesforce-objects>
+              <salesforce:update-object>
+                <salesforce:id><![CDATA[#[vars.payload.sfId]]]></salesforce:id>
+                <salesforce:type>Contact</salesforce:type>
+                <salesforce:fields><![CDATA[#[vars.payload.contact]]]></salesforce:fields>
+              </salesforce:update-object>
+            </salesforce:salesforce-objects>
+          </salesforce:update>
+        </when>
+        <otherwise>
+          <salesforce:create config-ref="Salesforce_Config" doc:name="Create Contact">
+            <salesforce:salesforce-objects>
+              <salesforce:create-object>
+                <salesforce:type>Contact</salesforce:type>
+                <salesforce:fields><![CDATA[#[vars.payload.contact]]]></salesforce:fields>
+              </salesforce:create-object>
+            </salesforce:salesforce-objects>
+          </salesforce:create>
+        </otherwise>
+      </choice>
+
+      <ee:transform doc:name="Transform Response">
+        <ee:message>
+          <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+var result = payload[0]
+---
+{
+  id: null,
+  globalId: null,
+  externalIds: [{
+    system: "Salesforce",
+    value: result.id
+  }],
+  customerNumber: vars.payload.contact.AccountNumber,
+  party: vars.payload.originalPayload.party,
+  status: vars.payload.contact.Status__c
+}]]></ee:set-payload>
+        </ee:message>
+      </ee:transform>
+
+      <http:response statusCode="#[vars.payload.sfId == null ? 201 : 200]" doc:name="HTTP Response"/>
+      
+      <error-handler>
+        <on-error-propagate type="SALESFORCE:*" enableNotifications="true" logException="true" doc:name="Salesforce Error">
+          <ee:transform doc:name="Transform Error">
+            <ee:message>
+              <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  error: {
+    code: "SALESFORCE_ERROR",
+    message: "An error occurred while upserting customer in Salesforce",
+    timestamp: now()
+  }
+}]]></ee:set-payload>
+            </ee:message>
+          </ee:transform>
+          <http:response statusCode="500" doc:name="HTTP Response"/>
+        </on-error-propagate>
+      </error-handler>
+    </try>
+  </flow>
+
+  <!-- GET /customers/{sfId} - Business Logic Flow -->
+  <flow name="get-customer-by-sf-id-business-logic" doc:name="get-customer-by-sf-id-business-logic">
+    <try doc:name="Try">
+      <salesforce:get config-ref="Salesforce_Config" doc:name="Get Contact">
+        <salesforce:ids><![CDATA[#[vars.sfId]]]></salesforce:ids>
+        <salesforce:salesforce-object>Contact</salesforce:salesforce-object>
+      </salesforce:get>
+
+      <ee:transform doc:name="Transform Response">
+        <ee:message>
+          <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+var contact = payload
+---
+{
+  id: null,
+  globalId: null,
+  externalIds: [{
+    system: "Salesforce",
+    value: contact.Id
+  }],
+  customerNumber: contact.AccountNumber default null,
+  party: {
+    partyType: "Individual",
+    firstName: contact.FirstName default null,
+    lastName: contact.LastName default null,
+    taxId: contact.TaxId__c default null
+  },
+  status: contact.Status__c default "Active"
+}]]></ee:set-payload>
+        </ee:message>
+      </ee:transform>
+
+      <http:response statusCode="200" doc:name="HTTP Response"/>
+      
+      <error-handler>
+        <on-error-propagate type="SALESFORCE:*" enableNotifications="true" logException="true" doc:name="Salesforce Error">
+          <ee:transform doc:name="Transform Error">
+            <ee:message>
+              <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  error: {
+    code: "NOT_FOUND",
+    message: "Customer not found in Salesforce",
+    timestamp: now()
+  }
+}]]></ee:set-payload>
+            </ee:message>
+          </ee:transform>
+          <http:response statusCode="404" doc:name="HTTP Response"/>
+        </on-error-propagate>
+      </error-handler>
+    </try>
+  </flow>
+
+</mule>

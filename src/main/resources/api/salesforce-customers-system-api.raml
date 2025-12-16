@@ -1,0 +1,100 @@
+#%RAML 1.0
+title: Salesforce Customers System API
+version: 1.0.0
+baseUri: http://localhost:8081/api/salesforce/customers
+mediaType: application/json
+
+documentation:
+  - title: Overview
+    content: API système pour gérer les clients dans Salesforce Financial Services Cloud
+
+types:
+  Customer:
+    type: object
+    properties:
+      id?: string
+      globalId?: string
+      externalIds:
+        type: array
+        items:
+          type: object
+          properties:
+            system: string
+            value: string
+      customerNumber?: string
+      party:
+        type: object
+        properties:
+          partyType: string
+          firstName?: string
+          lastName?: string
+          taxId?: string
+      status?: string
+  ErrorResponse:
+    type: object
+    properties:
+      error:
+        type: object
+        properties:
+          code: string
+          message: string
+
+/customers:
+  displayName: Salesforce Customers
+  description: Opérations sur les clients Salesforce
+  
+  get:
+    displayName: Get Customers
+    queryParameters:
+      limit:
+        type: integer
+        required: false
+        default: 200
+      offset:
+        type: integer
+        required: false
+        default: 0
+      sfId:
+        type: string
+        required: false
+    responses:
+      200:
+        body:
+          application/json:
+            type: Customer[]
+      400:
+        body:
+          application/json:
+            type: ErrorResponse
+
+  post:
+    displayName: Upsert Customer
+    body:
+      application/json:
+        type: Customer
+    responses:
+      200:
+        body:
+          application/json:
+            type: Customer
+      201:
+        body:
+          application/json:
+            type: Customer
+
+  /{sfId}:
+    displayName: Customer by Salesforce ID
+    uriParameters:
+      sfId:
+        type: string
+    get:
+      displayName: Get Customer by Salesforce ID
+      responses:
+        200:
+          body:
+            application/json:
+              type: Customer
+        404:
+          body:
+            application/json:
+              type: ErrorResponse
