@@ -55,7 +55,7 @@ records map ((contact) -> {
         </ee:message>
       </ee:transform>
 
-      <http:response statusCode="200" doc:name="HTTP Response"/>
+      <set-variable value="200" doc:name="httpStatus" doc:id="d2a833bc-9d01-4c7c-b502-47d87414d3e1" variableName="httpStatus"/>
       
       <error-handler>
         <on-error-propagate type="SALESFORCE:*" enableNotifications="true" logException="true" doc:name="Salesforce Error">
@@ -73,7 +73,7 @@ output application/json
 }]]></ee:set-payload>
             </ee:message>
           </ee:transform>
-          <http:response statusCode="500" doc:name="HTTP Response"/>
+          <set-variable value="500" doc:name="httpStatus" doc:id="45b3b2b8-d606-4743-bc44-9f9bd2e28ce1" variableName="httpStatus"/>
         </on-error-propagate>
       </error-handler>
     </try>
@@ -93,8 +93,8 @@ var sfId = payload.externalIds filter ($.system == "Salesforce")[0].value defaul
   contact: {
     FirstName: party.firstName default null,
     LastName: party.lastName default null,
-    PersonEmail: party.contactPoints filter ($.type == "Email")[0].value default null,
-    Phone: party.contactPoints filter ($.type == "Phone")[0].value default null,
+    PersonEmail: party.contactPoints filter ($."type" == "Email")[0].value default null,
+    Phone: party.contactPoints filter ($."type" == "Phone")[0].value default null,
     AccountNumber: payload.customerNumber default null,
     TaxId__c: party.taxId default null,
     Status__c: payload.status default "Active"
@@ -148,7 +148,7 @@ var result = payload[0]
         </ee:message>
       </ee:transform>
 
-      <http:response statusCode="#[vars.payload.sfId == null ? 201 : 200]" doc:name="HTTP Response"/>
+      <set-variable value="#[vars.payload.sfId == null ? 201 : 200]" doc:name="httpStatus" doc:id="08e5fc87-ba86-48d0-9e1a-63532468fb4a" variableName="httpStatus"/>
       
       <error-handler>
         <on-error-propagate type="SALESFORCE:*" enableNotifications="true" logException="true" doc:name="Salesforce Error">
@@ -166,7 +166,7 @@ output application/json
 }]]></ee:set-payload>
             </ee:message>
           </ee:transform>
-          <http:response statusCode="500" doc:name="HTTP Response"/>
+          <set-variable value="500" doc:name="httpStatus" doc:id="1bb05e41-794b-42e7-bddb-ef33c572f3ef" variableName="httpStatus"/>
         </on-error-propagate>
       </error-handler>
     </try>
@@ -174,17 +174,24 @@ output application/json
 
   <!-- GET /customers/{sfId} - Business Logic Flow -->
   <flow name="get-customer-by-sf-id-business-logic" doc:name="get-customer-by-sf-id-business-logic">
+    <ee:transform doc:name="Build SOQL Query">
+      <ee:message>
+        <ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+"SELECT Id, FirstName, LastName, PersonEmail, Phone, AccountNumber, TaxId__c, Status__c FROM Contact WHERE Id = '" ++ vars.sfId ++ "' LIMIT 1"]]></ee:set-payload>
+      </ee:message>
+    </ee:transform>
     <try doc:name="Try">
-      <salesforce:get config-ref="Salesforce_Config" doc:name="Get Contact">
-        <salesforce:ids><![CDATA[#[vars.sfId]]]></salesforce:ids>
-        <salesforce:salesforce-object>Contact</salesforce:salesforce-object>
-      </salesforce:get>
-
-      <ee:transform doc:name="Transform Response">
+      <salesforce:query config-ref="Salesforce_Config" doc:name="Query Salesforce Contact">
+        <salesforce:salesforce-query><![CDATA[#[payload]]]></salesforce:salesforce-query>
+      </salesforce:query>
+			<ee:transform doc:name="Transform Response">
         <ee:message>
           <ee:set-payload><![CDATA[%dw 2.0
 output application/json
-var contact = payload
+var records = payload.records default []
+var contact = records[0] default {}
 ---
 {
   id: null,
@@ -205,7 +212,7 @@ var contact = payload
         </ee:message>
       </ee:transform>
 
-      <http:response statusCode="200" doc:name="HTTP Response"/>
+      <set-variable value="200" doc:name="httpStatus" doc:id="e7ae75fb-6882-4922-8db6-7c21fcab3ade" variableName="httpStatus"/>
       
       <error-handler>
         <on-error-propagate type="SALESFORCE:*" enableNotifications="true" logException="true" doc:name="Salesforce Error">
@@ -223,7 +230,7 @@ output application/json
 }]]></ee:set-payload>
             </ee:message>
           </ee:transform>
-          <http:response statusCode="404" doc:name="HTTP Response"/>
+          <set-variable value="404" doc:name="httpStatus" doc:id="8fcda435-8554-4025-8afc-f78aa9506799" variableName="httpStatus"/>
         </on-error-propagate>
       </error-handler>
     </try>
