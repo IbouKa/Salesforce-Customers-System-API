@@ -114,7 +114,7 @@ output application/json
     <ee:transform doc:name="Build Query Parameters">
       <ee:message>
         <ee:set-payload><![CDATA[%dw 2.0
-output application/java
+output application/json
 ---
 {
   limit: (attributes.queryParams.limit as Number default 200) as String,
