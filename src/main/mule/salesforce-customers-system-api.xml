@@ -1,11 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <mule xmlns="http://www.mulesoft.org/schema/mule/core"
-  xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
   xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
   xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
-      http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
       http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
 
   <!-- GET /customers - Business Logic Flow -->
@@ -26,40 +24,51 @@ var sfId = payload.sfId default null
       </ee:message>
     </ee:transform>
     <try doc:name="Try">
-      <!-- MOCK: Remplacement de l'appel Salesforce par des données mockées -->
-      <ee:transform doc:name="Mock Query Salesforce Contacts" doc:id="mock-query-sf-contacts">
+      <ee:transform doc:name="Mock Query Salesforce Contacts">
         <ee:message>
           <ee:set-payload><![CDATA[%dw 2.0
 output application/java
 var queryParams = payload
-var limit = queryParams.limit as Number default 200
-var offset = queryParams.offset as Number default 0
+var sfId = queryParams.sfId default null
 ---
+// Mock Salesforce query response
 {
+  records: if (sfId != null and sfId != "")
+    [{
+      Id: sfId,
+      FirstName: "John",
+      LastName: "Doe",
+      PersonEmail: "john.doe@example.com",
+      Phone: "+1234567890",
+      AccountNumber: "CUST-000001",
+      TaxId__c: "TAX-123456",
+      Status__c: "Active"
+    }]
+  else
+    [
+      {
+        Id: "SF-001",
+        FirstName: "John",
+        LastName: "Doe",
+        PersonEmail: "john.doe@example.com",
+        Phone: "+1234567890",
+        AccountNumber: "CUST-000001",
+        TaxId__c: "TAX-123456",
+        Status__c: "Active"
+      },
+      {
+        Id: "SF-002",
+        FirstName: "Jane",
+        LastName: "Smith",
+        PersonEmail: "jane.smith@example.com",
+        Phone: "+1234567891",
+        AccountNumber: "CUST-000002",
+        TaxId__c: "TAX-789012",
+        Status__c: "Active"
+      }
+    ],
   totalSize: 2,
-  done: true,
-  records: [
-    {
-      Id: "003XX000004TmiQAAS",
-      FirstName: "Jean",
-      LastName: "Dupont",
-      PersonEmail: "jean.dupont@example.com",
-      Phone: "+33123456789",
-      AccountNumber: "CUST001",
-      TaxId__c: "123456789",
-      Status__c: "Active"
-    },
-    {
-      Id: "003XX000004TmiQAAT",
-      FirstName: "Marie",
-      LastName: "Martin",
-      PersonEmail: "marie.martin@example.com",
-      Phone: "+33987654321",
-      AccountNumber: "CUST002",
-      TaxId__c: "987654321",
-      Status__c: "Active"
-    }
-  ]
+  done: true
 }]]></ee:set-payload>
         </ee:message>
       </ee:transform>
@@ -89,10 +98,29 @@ records map ((contact) -> {
         </ee:message>
       </ee:transform>
 
-      <set-variable value="200" doc:name="httpStatus" doc:id="d2a833bc-9d01-4c7c-b502-47d87414d3e1" variableName="httpStatus"/>
+          <set-variable value="200" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus"/>
+        </when>
+        <otherwise>
+          <ee:transform doc:name="Error Response">
+            <ee:message>
+              <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  error: {
+    code: "NOT_FOUND",
+    message: "Customer not found in Salesforce",
+    timestamp: now()
+  }
+}]]></ee:set-payload>
+            </ee:message>
+          </ee:transform>
+          <set-variable value="404" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus"/>
+        </otherwise>
+      </choice>
       
       <error-handler>
-        <on-error-propagate type="SALESFORCE:*" enableNotifications="true" logException="true" doc:name="Salesforce Error">
+        <on-error-propagate type="*" enableNotifications="true" logException="true" doc:name="Error Handler">
           <ee:transform doc:name="Transform Error">
             <ee:message>
               <ee:set-payload><![CDATA[%dw 2.0
@@ -107,7 +135,7 @@ output application/json
 }]]></ee:set-payload>
             </ee:message>
           </ee:transform>
-          <set-variable value="500" doc:name="httpStatus" doc:id="45b3b2b8-d606-4743-bc44-9f9bd2e28ce1" variableName="httpStatus"/>
+          <set-variable value="500" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus"/>
         </on-error-propagate>
       </error-handler>
     </try>
@@ -127,8 +155,8 @@ var sfId = payload.externalIds filter ($.system == "Salesforce")[0].value defaul
   contact: {
     FirstName: party.firstName default null,
     LastName: party.lastName default null,
-    PersonEmail: party.contactPoints filter ($."type" == "Email")[0].value default null,
-    Phone: party.contactPoints filter ($."type" == "Phone")[0].value default null,
+    PersonEmail: party.contactPoints filter ($.type == "Email")[0].value default null,
+    Phone: party.contactPoints filter ($.type == "Phone")[0].value default null,
     AccountNumber: payload.customerNumber default null,
     TaxId__c: party.taxId default null,
     Status__c: payload.status default "Active"
@@ -138,36 +166,20 @@ var sfId = payload.externalIds filter ($.system == "Salesforce")[0].value defaul
     </ee:transform>
 
     <try doc:name="Try">
-      <choice doc:name="Upsert Strategy">
-        <when expression="#[vars.payload.sfId != null]">
-          <!-- MOCK: Remplacement de l'appel Salesforce update par des données mockées -->
-          <ee:transform doc:name="Mock Update Contact" doc:id="mock-update-sf-contact">
-            <ee:message>
-              <ee:set-payload><![CDATA[%dw 2.0
+      <ee:transform doc:name="Mock Upsert Salesforce Contact">
+        <ee:message>
+          <ee:set-payload><![CDATA[%dw 2.0
 output application/java
+var req = vars.payload
+var sfId = req.sfId default ("SF-" ++ (now() as String {format: "yyyyMMddHHmmssSSS"}))
 ---
+// Mock Salesforce upsert response
 [{
-  id: vars.payload.sfId,
+  id: sfId,
   success: true
 }]]]></ee:set-payload>
-            </ee:message>
-          </ee:transform>
-        </when>
-        <otherwise>
-          <!-- MOCK: Remplacement de l'appel Salesforce create par des données mockées -->
-          <ee:transform doc:name="Mock Create Contact" doc:id="mock-create-sf-contact">
-            <ee:message>
-              <ee:set-payload><![CDATA[%dw 2.0
-output application/java
----
-[{
-  id: "003XX000004TmiQAA" ++ randomInt(1000),
-  success: true
-}]]]></ee:set-payload>
-            </ee:message>
-          </ee:transform>
-        </otherwise>
-      </choice>
+        </ee:message>
+      </ee:transform>
 
       <ee:transform doc:name="Transform Response">
         <ee:message>
@@ -185,12 +197,12 @@ var originalPayload = vars.payload
   }],
   customerNumber: originalPayload.contact.AccountNumber,
   party: originalPayload.contact,
-  status: originalPayload.contact.Status__c
+  status: originalPayload.contact.Status__c default "Active"
 }]]></ee:set-payload>
         </ee:message>
       </ee:transform>
 
-      <set-variable value="#[vars.payload.sfId == null ? 201 : 200]" doc:name="httpStatus" doc:id="08e5fc87-ba86-48d0-9e1a-63532468fb4a" variableName="httpStatus"/>
+      <set-variable value="#[vars.payload.sfId == null ? 201 : 200]" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus"/>
       
       <error-handler>
         <on-error-propagate type="SALESFORCE:*" enableNotifications="true" logException="true" doc:name="Salesforce Error">
@@ -208,7 +220,7 @@ output application/json
 }]]></ee:set-payload>
             </ee:message>
           </ee:transform>
-          <set-variable value="500" doc:name="httpStatus" doc:id="1bb05e41-794b-42e7-bddb-ef33c572f3ef" variableName="httpStatus"/>
+          <set-variable value="500" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus"/>
         </on-error-propagate>
       </error-handler>
     </try>
@@ -216,46 +228,37 @@ output application/json
 
   <!-- GET /customers/{sfId} - Business Logic Flow -->
   <flow name="get-customer-by-sf-id-business-logic" doc:name="get-customer-by-sf-id-business-logic">
-    <ee:transform doc:name="Build SOQL Query">
-      <ee:message>
-        <ee:set-payload><![CDATA[%dw 2.0
-output application/java
----
-"SELECT Id, FirstName, LastName, PersonEmail, Phone, AccountNumber, TaxId__c, Status__c FROM Contact WHERE Id = '" ++ vars.sfId ++ "' LIMIT 1"]]></ee:set-payload>
-      </ee:message>
-    </ee:transform>
     <try doc:name="Try">
-      <!-- MOCK: Remplacement de l'appel Salesforce query par des données mockées -->
-      <ee:transform doc:name="Mock Query Salesforce Contact" doc:id="mock-query-sf-contact">
+      <ee:transform doc:name="Mock Get Salesforce Contact">
         <ee:message>
           <ee:set-payload><![CDATA[%dw 2.0
 output application/java
-var sfId = vars.sfId default "003XX000004TmiQAAS"
+var sfId = vars.sfId
 ---
-{
-  totalSize: 1,
-  done: true,
-  records: [
-    {
-      Id: sfId,
-      FirstName: "Jean",
-      LastName: "Dupont",
-      PersonEmail: "jean.dupont@example.com",
-      Phone: "+33123456789",
-      AccountNumber: "CUST001",
-      TaxId__c: "123456789",
-      Status__c: "Active"
-    }
-  ]
-}]]></ee:set-payload>
+// Mock Salesforce get response
+if (sfId != null and sfId != "")
+  {
+    Id: sfId,
+    FirstName: "John",
+    LastName: "Doe",
+    PersonEmail: "john.doe@example.com",
+    Phone: "+1234567890",
+    AccountNumber: "CUST-000001",
+    TaxId__c: "TAX-123456",
+    Status__c: "Active"
+  }
+else
+  null]]></ee:set-payload>
         </ee:message>
       </ee:transform>
-			<ee:transform doc:name="Transform Response">
+
+      <choice doc:name="Contact Found?">
+        <when expression="#[payload != null]">
+          <ee:transform doc:name="Transform Response">
         <ee:message>
           <ee:set-payload><![CDATA[%dw 2.0
 output application/json
-var records = payload.records default []
-var contact = records[0] default {}
+var contact = payload
 ---
 {
   id: null,
@@ -276,10 +279,29 @@ var contact = records[0] default {}
         </ee:message>
       </ee:transform>
 
-      <set-variable value="200" doc:name="httpStatus" doc:id="e7ae75fb-6882-4922-8db6-7c21fcab3ade" variableName="httpStatus"/>
+          <set-variable value="200" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus"/>
+        </when>
+        <otherwise>
+          <ee:transform doc:name="Error Response">
+            <ee:message>
+              <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  error: {
+    code: "NOT_FOUND",
+    message: "Customer not found in Salesforce",
+    timestamp: now()
+  }
+}]]></ee:set-payload>
+            </ee:message>
+          </ee:transform>
+          <set-variable value="404" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus"/>
+        </otherwise>
+      </choice>
       
       <error-handler>
-        <on-error-propagate type="SALESFORCE:*" enableNotifications="true" logException="true" doc:name="Salesforce Error">
+        <on-error-propagate type="*" enableNotifications="true" logException="true" doc:name="Error Handler">
           <ee:transform doc:name="Transform Error">
             <ee:message>
               <ee:set-payload><![CDATA[%dw 2.0
@@ -294,7 +316,7 @@ output application/json
 }]]></ee:set-payload>
             </ee:message>
           </ee:transform>
-          <set-variable value="404" doc:name="httpStatus" doc:id="8fcda435-8554-4025-8afc-f78aa9506799" variableName="httpStatus"/>
+          <set-variable value="404" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus"/>
         </on-error-propagate>
       </error-handler>
     </try>

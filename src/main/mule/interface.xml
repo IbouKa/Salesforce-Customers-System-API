@@ -8,8 +8,7 @@
       xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
       http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
       http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
-      http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
-http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd">
+      http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
 
   <!-- APIkit Router Configuration -->
   <apikit:config name="salesforce-customers-system-api-config" 
@@ -20,8 +19,8 @@ http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/m
   <!-- Main HTTP Listener with APIkit Router -->
   <flow name="main">
     <http:listener config-ref="HTTP_Listener_config" path="/api/*" doc:name="HTTP Listener"/>
-    <apikit:router doc:name="APIkit Router" doc:id="d22bf804-55fb-4547-b8c8-efd33e200dc3" config-ref="salesforce-customers-system-api-config"/>
-		<error-handler>
+    <apikit:router config-ref="salesforce-customers-system-api-config" doc:name="APIkit Router"/>
+    <error-handler>
       <on-error-propagate type="APIKIT:NOT_FOUND" enableNotifications="true" logException="true" doc:name="On Error Propagate">
         <ee:transform doc:name="Transform Error Response">
           <ee:message>
@@ -37,7 +36,7 @@ output application/json
 }]]></ee:set-payload>
           </ee:message>
         </ee:transform>
-				<set-variable value="404" doc:name="httpStatus" doc:id="2fa5cf9f-b1d3-4ddf-bb39-1905f248a85c" variableName="httpStatus"/>
+        <set-variable value="404" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus"/>
       </on-error-propagate>
       <on-error-propagate type="APIKIT:BAD_REQUEST" enableNotifications="true" logException="true" doc:name="On Error Propagate">
         <ee:transform doc:name="Transform Error Response">
@@ -54,7 +53,7 @@ output application/json
 }]]></ee:set-payload>
           </ee:message>
         </ee:transform>
-				<set-variable value="400" doc:name="httpStatus" doc:id="17e4933f-a71b-4488-b561-a43cb52a989f" variableName="httpStatus"/>
+        <set-variable value="400" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus"/>
       </on-error-propagate>
       <on-error-propagate type="APIKIT:NOT_ACCEPTABLE" enableNotifications="true" logException="true" doc:name="On Error Propagate">
         <ee:transform doc:name="Transform Error Response">
@@ -71,7 +70,7 @@ output application/json
 }]]></ee:set-payload>
           </ee:message>
         </ee:transform>
-				<set-variable value="406" doc:name="httpStatus" doc:id="91e8b68b-2569-415c-923f-00ac6313f773" variableName="httpStatus"/>
+        <set-variable value="406" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus"/>
       </on-error-propagate>
       <on-error-propagate type="APIKIT:UNSUPPORTED_MEDIA_TYPE" enableNotifications="true" logException="true" doc:name="On Error Propagate">
         <ee:transform doc:name="Transform Error Response">
@@ -88,7 +87,7 @@ output application/json
 }]]></ee:set-payload>
           </ee:message>
         </ee:transform>
-				<set-variable value="415" doc:name="httpStatus" doc:id="f25c27ee-762a-443a-b19b-cd1b117cccc8" variableName="httpStatus"/>
+        <set-variable value="415" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus"/>
       </on-error-propagate>
       <on-error-propagate type="APIKIT:METHOD_NOT_ALLOWED" enableNotifications="true" logException="true" doc:name="On Error Propagate">
         <ee:transform doc:name="Transform Error Response">
@@ -105,7 +104,7 @@ output application/json
 }]]></ee:set-payload>
           </ee:message>
         </ee:transform>
-				<set-variable value="405" doc:name="httpStatus" doc:id="022ce2a1-613b-4ce6-a3d9-5842d7b15717" variableName="httpStatus"/>
+        <set-variable value="405" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus"/>
       </on-error-propagate>
     </error-handler>
   </flow>
@@ -133,7 +132,7 @@ output application/java
   </flow>
 
   <!-- GET /customers/{sfId} -->
-  <flow name="get:\customers\(sfId):salesforce-customers-system-api-config">
+  <flow name="get:\customers\{sfId}:salesforce-customers-system-api-config">
     <set-variable value="#[attributes.uriParams.sfId]" variableName="sfId" doc:name="Set Salesforce ID"/>
     <flow-ref name="get-customer-by-sf-id-business-logic" doc:name="get-customer-by-sf-id-business-logic"/>
   </flow>
