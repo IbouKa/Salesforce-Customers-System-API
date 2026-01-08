@@ -26,9 +26,43 @@ var sfId = payload.sfId default null
       </ee:message>
     </ee:transform>
     <try doc:name="Try">
-      <salesforce:query config-ref="Salesforce_Config" doc:name="Query Salesforce Contacts">
-        <salesforce:salesforce-query><![CDATA[#[payload.query]]]></salesforce:salesforce-query>
-      </salesforce:query>
+      <!-- MOCK: Remplacement de l'appel Salesforce par des données mockées -->
+      <ee:transform doc:name="Mock Query Salesforce Contacts" doc:id="mock-query-sf-contacts">
+        <ee:message>
+          <ee:set-payload><![CDATA[%dw 2.0
+output application/java
+var queryParams = payload
+var limit = queryParams.limit as Number default 200
+var offset = queryParams.offset as Number default 0
+---
+{
+  totalSize: 2,
+  done: true,
+  records: [
+    {
+      Id: "003XX000004TmiQAAS",
+      FirstName: "Jean",
+      LastName: "Dupont",
+      PersonEmail: "jean.dupont@example.com",
+      Phone: "+33123456789",
+      AccountNumber: "CUST001",
+      TaxId__c: "123456789",
+      Status__c: "Active"
+    },
+    {
+      Id: "003XX000004TmiQAAT",
+      FirstName: "Marie",
+      LastName: "Martin",
+      PersonEmail: "marie.martin@example.com",
+      Phone: "+33987654321",
+      AccountNumber: "CUST002",
+      TaxId__c: "987654321",
+      Status__c: "Active"
+    }
+  ]
+}]]></ee:set-payload>
+        </ee:message>
+      </ee:transform>
 
       <ee:transform doc:name="Transform to Customer Response">
         <ee:message>
@@ -106,25 +140,32 @@ var sfId = payload.externalIds filter ($.system == "Salesforce")[0].value defaul
     <try doc:name="Try">
       <choice doc:name="Upsert Strategy">
         <when expression="#[vars.payload.sfId != null]">
-          <salesforce:update config-ref="Salesforce_Config" doc:name="Update Contact">
-            <salesforce:salesforce-objects>
-              <salesforce:update-object>
-                <salesforce:id><![CDATA[#[vars.payload.sfId]]]></salesforce:id>
-                <salesforce:type>Contact</salesforce:type>
-                <salesforce:fields><![CDATA[#[vars.payload.contact]]]></salesforce:fields>
-              </salesforce:update-object>
-            </salesforce:salesforce-objects>
-          </salesforce:update>
+          <!-- MOCK: Remplacement de l'appel Salesforce update par des données mockées -->
+          <ee:transform doc:name="Mock Update Contact" doc:id="mock-update-sf-contact">
+            <ee:message>
+              <ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+[{
+  id: vars.payload.sfId,
+  success: true
+}]]]></ee:set-payload>
+            </ee:message>
+          </ee:transform>
         </when>
         <otherwise>
-          <salesforce:create config-ref="Salesforce_Config" doc:name="Create Contact">
-            <salesforce:salesforce-objects>
-              <salesforce:create-object>
-                <salesforce:type>Contact</salesforce:type>
-                <salesforce:fields><![CDATA[#[vars.payload.contact]]]></salesforce:fields>
-              </salesforce:create-object>
-            </salesforce:salesforce-objects>
-          </salesforce:create>
+          <!-- MOCK: Remplacement de l'appel Salesforce create par des données mockées -->
+          <ee:transform doc:name="Mock Create Contact" doc:id="mock-create-sf-contact">
+            <ee:message>
+              <ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+[{
+  id: "003XX000004TmiQAA" ++ randomInt(1000),
+  success: true
+}]]]></ee:set-payload>
+            </ee:message>
+          </ee:transform>
         </otherwise>
       </choice>
 
@@ -133,6 +174,7 @@ var sfId = payload.externalIds filter ($.system == "Salesforce")[0].value defaul
           <ee:set-payload><![CDATA[%dw 2.0
 output application/json
 var result = payload[0]
+var originalPayload = vars.payload
 ---
 {
   id: null,
@@ -141,9 +183,9 @@ var result = payload[0]
     system: "Salesforce",
     value: result.id
   }],
-  customerNumber: vars.payload.contact.AccountNumber,
-  party: vars.payload.originalPayload.party,
-  status: vars.payload.contact.Status__c
+  customerNumber: originalPayload.contact.AccountNumber,
+  party: originalPayload.contact,
+  status: originalPayload.contact.Status__c
 }]]></ee:set-payload>
         </ee:message>
       </ee:transform>
@@ -183,9 +225,31 @@ output application/java
       </ee:message>
     </ee:transform>
     <try doc:name="Try">
-      <salesforce:query config-ref="Salesforce_Config" doc:name="Query Salesforce Contact">
-        <salesforce:salesforce-query><![CDATA[#[payload]]]></salesforce:salesforce-query>
-      </salesforce:query>
+      <!-- MOCK: Remplacement de l'appel Salesforce query par des données mockées -->
+      <ee:transform doc:name="Mock Query Salesforce Contact" doc:id="mock-query-sf-contact">
+        <ee:message>
+          <ee:set-payload><![CDATA[%dw 2.0
+output application/java
+var sfId = vars.sfId default "003XX000004TmiQAAS"
+---
+{
+  totalSize: 1,
+  done: true,
+  records: [
+    {
+      Id: sfId,
+      FirstName: "Jean",
+      LastName: "Dupont",
+      PersonEmail: "jean.dupont@example.com",
+      Phone: "+33123456789",
+      AccountNumber: "CUST001",
+      TaxId__c: "123456789",
+      Status__c: "Active"
+    }
+  ]
+}]]></ee:set-payload>
+        </ee:message>
+      </ee:transform>
 			<ee:transform doc:name="Transform Response">
         <ee:message>
           <ee:set-payload><![CDATA[%dw 2.0
