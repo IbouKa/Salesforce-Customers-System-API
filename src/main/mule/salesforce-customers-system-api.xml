@@ -72,9 +72,8 @@ var sfId = queryParams.sfId default null
 }]]></ee:set-payload>
         </ee:message>
       </ee:transform>
-			<choice>
-				<when expression="#[payload != null]">
-					<ee:transform doc:name="Transform to Customer Response">
+
+      <ee:transform doc:name="Transform to Customer Response">
         <ee:message>
           <ee:set-payload><![CDATA[%dw 2.0
 output application/json
@@ -98,12 +97,13 @@ records map ((contact) -> {
 })]]></ee:set-payload>
         </ee:message>
       </ee:transform>
-					<set-variable value="200" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus" />
-				</when>
-				<otherwise >
-					<ee:transform doc:name="Error Response" doc:id="c8ab3253-5441-48cd-92b8-da360e9da675" >
-						<ee:message >
-							<ee:set-payload ><![CDATA[%dw 2.0
+
+          <set-variable value="200" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus"/>
+        </when>
+        <otherwise>
+          <ee:transform doc:name="Error Response">
+            <ee:message>
+              <ee:set-payload><![CDATA[%dw 2.0
 output application/json
 ---
 {
@@ -113,11 +113,11 @@ output application/json
     timestamp: now()
   }
 }]]></ee:set-payload>
-						</ee:message>
-					</ee:transform>
-					<set-variable value="404" doc:name="httpStatus" doc:id="6498906d-b0bd-4a52-9fe0-c293f329a4d6" variableName="httpStatus"/>
-				</otherwise>
-			</choice>
+            </ee:message>
+          </ee:transform>
+          <set-variable value="404" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus"/>
+        </otherwise>
+      </choice>
       
       <error-handler>
         <on-error-propagate type="*" enableNotifications="true" logException="true" doc:name="Error Handler">
@@ -155,8 +155,8 @@ var sfId = payload.externalIds filter ($.system == "Salesforce")[0].value defaul
   contact: {
     FirstName: party.firstName default null,
     LastName: party.lastName default null,
-    PersonEmail: party.contactPoints filter ($."type" == "Email")[0].value default null,
-    Phone: party.contactPoints filter ($."type" == "Phone")[0].value default null,
+    PersonEmail: party.contactPoints filter ($.type == "Email")[0].value default null,
+    Phone: party.contactPoints filter ($.type == "Phone")[0].value default null,
     AccountNumber: payload.customerNumber default null,
     TaxId__c: party.taxId default null,
     Status__c: payload.status default "Active"
@@ -202,7 +202,7 @@ var originalPayload = vars.payload
         </ee:message>
       </ee:transform>
 
-      <set-variable value="#[if(vars.payload.sfId == null) 201 else 200]" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus"/>
+      <set-variable value="#[vars.payload.sfId == null ? 201 : 200]" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus"/>
       
       <error-handler>
         <on-error-propagate type="SALESFORCE:*" enableNotifications="true" logException="true" doc:name="Salesforce Error">
