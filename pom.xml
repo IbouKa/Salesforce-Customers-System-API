@@ -1,18 +1,14 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    
     <artifactId>salesforce-customers-system-api</artifactId>
     <groupId>com.mulesoft.app</groupId>
     <version>1.0.0</version>
     <packaging>mule-application</packaging>
-    
     <name>salesforce-customers-system-api</name>
-    
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        
         <app.runtime>4.10.0</app.runtime>
         <mule.version>4.10.0</mule.version>
         <mule.tools.version>4.5.2</mule.tools.version>
@@ -21,7 +17,6 @@
         <!-- Skip Exchange plugin goals for independent builds -->
         <exchange.maven.restConnect.skip>true</exchange.maven.restConnect.skip>
     </properties>
-    
     <build>
         <plugins>
             <plugin>
@@ -42,6 +37,7 @@
                     <compilerArgs>
                         <args>-parameters</args>
                     </compilerArgs>
+                    <source>1.8</source>
                     <target>1.8</target>
                 </configuration>
             </plugin>
@@ -70,7 +66,6 @@
             </plugin>
         </plugins>
     </build>
-    
     <repositories>
         <repository>
             <id>anypoint-exchange</id>
@@ -85,7 +80,6 @@
             <layout>default</layout>
         </repository>
     </repositories>
-    
     <pluginRepositories>
         <pluginRepository>
             <id>mulesoft-releases</id>
@@ -108,7 +102,6 @@
             <url>https://repository.mulesoft.org/nexus/content/repositories/public/</url>
         </pluginRepository>
     </pluginRepositories>
-    
     <dependencies>
         <dependency>
             <groupId>org.mule.modules</groupId>
