@@ -41,3 +41,7 @@ Thumbs.db
 *.d.ts
 *.js.map 
 .tooling-project
+
+# Exchange (generated files that interfere with independent builds)
+.exchange.xml
+.exchange_modules_tmp/

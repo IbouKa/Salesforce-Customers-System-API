@@ -18,6 +18,8 @@
         <mule.tools.version>4.5.2</mule.tools.version>
         <munit.version>3.4.0</munit.version>
         <mule.maven.plugin.version>4.5.2</mule.maven.plugin.version>
+        <!-- Skip Exchange plugin goals for independent builds -->
+        <exchange.maven.restConnect.skip>true</exchange.maven.restConnect.skip>
     </properties>
     
     <build>
@@ -28,7 +30,6 @@
                 <version>${mule.maven.plugin.version}</version>
                 <extensions>true</extensions>
                 <configuration>
-                    <filterAppDirectory>true</filterAppDirectory>
                     <classifier>mule-application</classifier>
                     <sharedLibraries/>
                 </configuration>
