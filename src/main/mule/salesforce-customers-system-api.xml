@@ -1,326 +1,200 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<mule xmlns="http://www.mulesoft.org/schema/mule/core"
-  xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
-  xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-      xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
-      http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
-
-  <!-- GET /customers - Business Logic Flow -->
-  <flow name="get-customers-business-logic" doc:name="get-customers-business-logic">
+<mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd       http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd  http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+	http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking.xsd">
+  <!-- Business Logic Flows -->
+  <flow doc:name="get-customers-business-logic" name="get-customers-business-logic">
     <ee:transform doc:name="Build SOQL Query">
       <ee:message>
-        <ee:set-payload><![CDATA[%dw 2.0
+        <ee:set-payload>
+          <![CDATA[%dw 2.0
 output application/java
-var limit = payload.limit as Number default 200
-var offset = payload.offset as Number default 0
 var sfId = payload.sfId default null
 ---
 {
-  query: "SELECT Id, FirstName, LastName, PersonEmail, Phone, AccountNumber, TaxId__c, Status__c FROM Contact " ++ 
-         (if (sfId != null) "WHERE Id = '" ++ sfId ++ "' " else "") ++
-         "LIMIT " ++ limit as String ++ " OFFSET " ++ offset as String
-}]]></ee:set-payload>
+  query: "SELECT Id,SourceSystemIdentifier, FirstName,LastName,Type,taxId__c,Status__c FROM Account where RecordType.Name ='Person Account' " ++ 
+         (if (sfId != null) "and Id = '" ++ sfId ++ "' " else "")
+}]]>
+        </ee:set-payload>
       </ee:message>
     </ee:transform>
-    <try doc:name="Try">
-      <ee:transform doc:name="Mock Query Salesforce Contacts">
-        <ee:message>
-          <ee:set-payload><![CDATA[%dw 2.0
-output application/java
-var queryParams = payload
-var sfId = queryParams.sfId default null
----
-// Mock Salesforce query response
-{
-  records: if (sfId != null and sfId != "")
-    [{
-      Id: sfId,
-      FirstName: "John",
-      LastName: "Doe",
-      PersonEmail: "john.doe@example.com",
-      Phone: "+1234567890",
-      AccountNumber: "CUST-000001",
-      TaxId__c: "TAX-123456",
-      Status__c: "Active"
-    }]
-  else
-    [
-      {
-        Id: "SF-001",
-        FirstName: "John",
-        LastName: "Doe",
-        PersonEmail: "john.doe@example.com",
-        Phone: "+1234567890",
-        AccountNumber: "CUST-000001",
-        TaxId__c: "TAX-123456",
-        Status__c: "Active"
-      },
-      {
-        Id: "SF-002",
-        FirstName: "Jane",
-        LastName: "Smith",
-        PersonEmail: "jane.smith@example.com",
-        Phone: "+1234567891",
-        AccountNumber: "CUST-000002",
-        TaxId__c: "TAX-789012",
-        Status__c: "Active"
-      }
-    ],
-  totalSize: 2,
-  done: true
-}]]></ee:set-payload>
-        </ee:message>
-      </ee:transform>
-        
-      <choice>
-				<when expression="#[payload != null]">
-					<ee:transform doc:name="Transform to Customer Response">
-        <ee:message>
-          <ee:set-payload><![CDATA[%dw 2.0
+    <salesforce:query-all doc:name="Query all" doc:id="wajlwa" config-ref="Sfdc-config">
+      <salesforce:salesforce-query>
+        <![CDATA[#[payload.query]]]>
+      </salesforce:salesforce-query>
+    </salesforce:query-all>
+    <ee:transform doc:name="Transform to Customer Response">
+      <ee:message>
+        <ee:set-payload>
+          <![CDATA[%dw 2.0
 output application/json
-var records = payload.records default []
+          var records = payload default []
 ---
-records map ((contact) -> {
-  id: null,
-  globalId: null,
-  externalIds: [{
-    system: "Salesforce",
-    value: contact.Id
-  }],
-  customerNumber: contact.AccountNumber default null,
-  party: {
-    partyType: "Individual",
-    firstName: contact.FirstName default null,
-    lastName: contact.LastName default null,
-    taxId: contact.TaxId__c default null
-  },
-  status: contact.Status__c default "Active"
-})]]></ee:set-payload>
-        </ee:message>
-      </ee:transform>
-					<set-variable value="200" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus" />
-				</when>
-				<otherwise>
-          <ee:transform doc:name="Error Response">
-            <ee:message>
-              <ee:set-payload><![CDATA[%dw 2.0
-output application/json
----
-{
-  error: {
-    code: "NOT_FOUND",
-    message: "Customer not found in Salesforce",
-    timestamp: now()
-  }
-}]]></ee:set-payload>
-            </ee:message>
-          </ee:transform>
-          <set-variable value="404" doc:name="httpStatus" doc:id="33b6adc8-fce2-4252-a0e2-05aeacf3a85c" variableName="httpStatus"/>
-        </otherwise>
-			</choice>
-      
-      <error-handler>
-        <on-error-propagate type="*" enableNotifications="true" logException="true" doc:name="Error Handler">
-          <ee:transform doc:name="Transform Error">
-            <ee:message>
-              <ee:set-payload><![CDATA[%dw 2.0
-output application/json
----
-{
-  error: {
-    code: "SALESFORCE_ERROR",
-    message: "An error occurred while querying Salesforce",
-    timestamp: now()
-  }
-}]]></ee:set-payload>
-            </ee:message>
-          </ee:transform>
-          <set-variable value="500" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus"/>
-        </on-error-propagate>
-      </error-handler>
-    </try>
+records map ((account) -> {
+            id: account.Id,
+            globalId: account.SourceSystemIdentifier,
+            externalIds: [{
+              system: "Salesforce",
+              value: account.SourceSystemIdentifier
+            }],
+            customerNumber: account.AccountNumber default null,
+            party: {
+              partyType: account.Type ,
+              firstName: account.FirstName default null,
+              lastName: account.LastName default null,
+              taxId: account.taxId__c default null
+            },
+            status: account.Status__c default "Active"
+          })]]>
+        </ee:set-payload>
+      </ee:message>
+    </ee:transform>
+    <set-variable doc:id="poblpc" doc:name="httpStatus" value="200" variableName="httpStatus"></set-variable>
   </flow>
-
   <!-- POST /customers - Business Logic Flow -->
-  <flow name="upsert-customer-business-logic" doc:name="upsert-customer-business-logic">
+  <flow doc:name="upsert-customer-business-logic" name="upsert-customer-business-logic">
     <ee:transform doc:name="Transform to Salesforce Format">
       <ee:message>
-        <ee:set-payload><![CDATA[%dw 2.0
+        <ee:set-payload>
+          <![CDATA[ payload]]>
+        </ee:set-payload>
+      </ee:message>
+      <ee:variables>
+        <ee:set-variable variableName="data">
+          <![CDATA[%dw 2.0
 output application/java
 var party = payload.party default {}
-var sfId = payload.externalIds filter ($.system == "Salesforce")[0].value default null
+var sfId = payload.id default null
 ---
 {
   sfId: sfId,
-  contact: {
+  account: {
+    (Id: sfId) if sfId != null,
+    (SourceSystemIdentifier: payload.globalId) if payload.globalId != null,
+    AccountNumber: payload.customerNumber default null,
+    Name: (party.firstName default "") ++ " " ++ (party.lastName default ""),
     FirstName: party.firstName default null,
     LastName: party.lastName default null,
-    PersonEmail: party.contactPoints filter ($."type" == "Email")[0].value default null,
-    Phone: party.contactPoints filter ($."type" == "Phone")[0].value default null,
-    AccountNumber: payload.customerNumber default null,
-    TaxId__c: party.taxId default null,
+    taxId__c: party.taxId default null,
+    Type: party.partyType default null,
     Status__c: payload.status default "Active"
   }
-}]]></ee:set-payload>
-      </ee:message>
+}]]>
+        </ee:set-variable>
+      </ee:variables>
     </ee:transform>
-
-    <try doc:name="Try">
-      <ee:transform doc:name="Mock Upsert Salesforce Contact">
-        <ee:message>
-          <ee:set-payload><![CDATA[%dw 2.0
-output application/java
-var req = vars.payload
-var sfId = req.sfId default ("SF-" ++ (now() as String {format: "yyyyMMddHHmmssSSS"}))
----
-// Mock Salesforce upsert response
-[{
-  id: sfId,
-  success: true
-}]]]></ee:set-payload>
-        </ee:message>
-      </ee:transform>
-
-      <ee:transform doc:name="Transform Response">
-        <ee:message>
-          <ee:set-payload><![CDATA[%dw 2.0
+    <salesforce:upsert doc:name="Upsert" doc:id="fdwsrt" objectType="Account" externalIdFieldName="Id" config-ref="Sfdc-config">
+      <salesforce:records>
+        <![CDATA[#[[vars.data.account]]]]>
+      </salesforce:records>
+    </salesforce:upsert>
+    <choice doc:name="Choice" doc:id="jhiosn">
+      <when doc:name="When" expression="#[payload.successful == true]">
+        <ee:transform doc:name="Transform" doc:id="ldprei">
+          <ee:message>
+            <ee:set-payload doc:name="Set payload" doc:id="gldahy">
+              <![CDATA[%dw 2.0
 output application/json
-var result = payload[0]
-var originalPayload = vars.payload
+var id = payload.items[0].payload.id
+var account = vars.data.account
 ---
 {
-  id: null,
-  globalId: null,
-  externalIds: [{
+  id: id default account.id default null,
+  globalId: account.SourceSystemIdentifier,
+  externalIds: {
     system: "Salesforce",
-    value: result.id
-  }],
-  customerNumber: originalPayload.contact.AccountNumber,
-  party: originalPayload.contact,
-  status: originalPayload.contact.Status__c default "Active"
-}]]></ee:set-payload>
-        </ee:message>
-      </ee:transform>
-
-      <set-variable value="#[if(vars.payload.sfId == null) 201 else 200]" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus"/>
-      
-      <error-handler>
-        <on-error-propagate type="SALESFORCE:*" enableNotifications="true" logException="true" doc:name="Salesforce Error">
-          <ee:transform doc:name="Transform Error">
-            <ee:message>
-              <ee:set-payload><![CDATA[%dw 2.0
+    value: account.SourceSystemIdentifier
+  },
+  customerNumber: account.AccountNumber,
+  party: {
+    partyType: account.Type,
+    firstName: account.FirstName,
+    lastName: account.LastName,
+    taxId: account.taxId__c
+  },
+  status: account.Status__c default "Active"
+}]]>
+            </ee:set-payload>
+          </ee:message>
+        </ee:transform>
+        <set-variable doc:id="lrevnz" doc:name="httpStatus" value="200" variableName="httpStatus"></set-variable>
+      </when>
+      <otherwise>
+        <ee:transform doc:name="Transform" doc:id="bbaxyr">
+          <ee:message>
+            <ee:set-payload doc:name="Set payload" doc:id="liqbiw">
+              <![CDATA[%dw 2.0
 output application/json
 ---
 {
   error: {
-    code: "SALESFORCE_ERROR",
-    message: "An error occurred while upserting customer in Salesforce",
+    code: "BAD_REQUEST",
+    message: payload.items[0].message default "Bad request",
     timestamp: now()
   }
-}]]></ee:set-payload>
-            </ee:message>
-          </ee:transform>
-          <set-variable value="500" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus"/>
-        </on-error-propagate>
-      </error-handler>
-    </try>
+}]]>
+            </ee:set-payload>
+          </ee:message>
+        </ee:transform>
+        <set-variable doc:id="rkkxnb" doc:name="httpStatus" value="400" variableName="httpStatus"></set-variable>
+      </otherwise>
+    </choice>
   </flow>
+  <!-- GET /customer-by-sf - Business Logic Flow -->
 
   <!-- GET /customers/{sfId} - Business Logic Flow -->
-  <flow name="get-customer-by-sf-id-business-logic" doc:name="get-customer-by-sf-id-business-logic">
-    <try doc:name="Try">
-      <ee:transform doc:name="Mock Get Salesforce Contact">
-        <ee:message>
-          <ee:set-payload><![CDATA[%dw 2.0
-output application/java
-var sfId = vars.sfId
----
-// Mock Salesforce get response
-if (sfId != null and sfId != "")
-  {
-    Id: sfId,
-    FirstName: "John",
-    LastName: "Doe",
-    PersonEmail: "john.doe@example.com",
-    Phone: "+1234567890",
-    AccountNumber: "CUST-000001",
-    TaxId__c: "TAX-123456",
-    Status__c: "Active"
-  }
-else
-  null]]></ee:set-payload>
-        </ee:message>
-      </ee:transform>
+  <flow doc:name="get-customer-by-sf-id-business-logic" name="get-customer-by-sf-id-business-logic">
 
-      <choice doc:name="Contact Found?">
-        <when expression="#[payload != null]">
-          <ee:transform doc:name="Transform Response">
-        <ee:message>
-          <ee:set-payload><![CDATA[%dw 2.0
-output application/json
-var contact = payload
+    <ee:transform doc:name="Build SOQL Query">
+      <ee:message>
+        <ee:set-payload>
+          <![CDATA[%dw 2.0
+output application/java
+var sfId = attributes.uriParams.sfId default null
 ---
 {
-  id: null,
-  globalId: null,
+  query: "SELECT Id,SourceSystemIdentifier, FirstName,LastName,Type,taxId__c,Status__c FROM Account where RecordType.Name ='Person Account' " ++ 
+         (if (sfId != null) "and Id = '" ++ sfId ++ "' " else "")
+}]]>
+        </ee:set-payload>
+      </ee:message>
+    </ee:transform>
+    <!-- [ACB] <salesforce:query-all doc:name="Query all" doc:id="query-all" config-ref="Sfdc-config">
+      <salesforce:salesforce-query>
+        <![CDATA[#[payload.query]]]>
+      </salesforce:salesforce-query>
+    </salesforce:query-all> [ACB] -->
+    <salesforce:query doc:name="Query" doc:id="pkaxfx" config-ref="Sfdc-config">
+      <salesforce:salesforce-query>
+        <![CDATA[#[payload.query]]]>
+      </salesforce:salesforce-query>
+    </salesforce:query>
+    <logger doc:name="Logger" doc:id="mbasam" message="#[payload]" />
+    <ee:transform doc:name="Transform to Customer Response">
+      <ee:message>
+        <ee:set-payload>
+          <![CDATA[%dw 2.0
+output application/json
+var account = payload[0] default {}
+---
+{
+  id: account.Id,
+  globalId: account.SourceSystemIdentifier,
   externalIds: [{
     system: "Salesforce",
-    value: contact.Id
+    value: account.SourceSystemIdentifier
   }],
-  customerNumber: contact.AccountNumber default null,
+  customerNumber: account.AccountNumber default null,
   party: {
-    partyType: "Individual",
-    firstName: contact.FirstName default null,
-    lastName: contact.LastName default null,
-    taxId: contact.TaxId__c default null
+    partyType: account.Type,
+    firstName: account.FirstName default null,
+    lastName: account.LastName default null,
+    taxId: account.taxId__c default null
   },
-  status: contact.Status__c default "Active"
-}]]></ee:set-payload>
-        </ee:message>
-      </ee:transform>
+  status: account.Status__c default "Active"
+}]]>
+        </ee:set-payload>
+      </ee:message>
+    </ee:transform>
+    <set-variable doc:id="poblpe" doc:name="httpStatus" value="200" variableName="httpStatus"></set-variable>
 
-          <set-variable value="200" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus"/>
-        </when>
-        <otherwise>
-          <ee:transform doc:name="Error Response">
-            <ee:message>
-              <ee:set-payload><![CDATA[%dw 2.0
-output application/json
----
-{
-  error: {
-    code: "NOT_FOUND",
-    message: "Customer not found in Salesforce",
-    timestamp: now()
-  }
-}]]></ee:set-payload>
-            </ee:message>
-          </ee:transform>
-          <set-variable value="404" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus"/>
-        </otherwise>
-      </choice>
-      
-      <error-handler>
-        <on-error-propagate type="*" enableNotifications="true" logException="true" doc:name="Error Handler">
-          <ee:transform doc:name="Transform Error">
-            <ee:message>
-              <ee:set-payload><![CDATA[%dw 2.0
-output application/json
----
-{
-  error: {
-    code: "NOT_FOUND",
-    message: "Customer not found in Salesforce",
-    timestamp: now()
-  }
-}]]></ee:set-payload>
-            </ee:message>
-          </ee:transform>
-          <set-variable value="404" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus"/>
-        </on-error-propagate>
-      </error-handler>
-    </try>
   </flow>
-
 </mule>

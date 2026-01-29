@@ -1,0 +1,14 @@
+# Salesforce Configuration
+salesforce.username=your-username
+salesforce.password=your-password
+salesforce.securityToken=your-security-token
+
+# HTTP Configuration
+http.port=8086
+http.host=0.0.0.0
+
+
+salesforce.clientId= 
+salesforce.clientSecret=
+salesforce.tokenUrl=
+salesforce.instanceUrl=

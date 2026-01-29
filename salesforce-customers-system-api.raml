@@ -5,7 +5,8 @@ baseUri: http://localhost:8081/api/salesforce/customers
 mediaType: application/json
 
 documentation:
-  - title: Overview
+  -
+    title: Overview
     content: API système pour gérer les clients dans Salesforce Financial Services Cloud
 
 types:
@@ -14,13 +15,11 @@ types:
     properties:
       id?: string
       globalId?: string
-      externalIds:
-        type: array
-        items:
-          type: object
-          properties:
-            system: string
-            value: string
+      externalId:
+        type: object
+        properties:
+          system: string
+          value: string
       customerNumber?: string
       party:
         type: object
@@ -42,7 +41,7 @@ types:
 /customers:
   displayName: Salesforce Customers
   description: Opérations sur les clients Salesforce
-  
+
   get:
     displayName: Get Customers
     queryParameters:

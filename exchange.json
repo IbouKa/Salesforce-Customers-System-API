@@ -3,10 +3,10 @@
   "name": "Salesforce Customers System API",
   "classifier": "raml",
   "organizationId": "167d12fd-a524-4ceb-9804-cb9e9ac3cdc3",
-  "descriptorVersion": "1.0.0",
+  "descriptorVersion": "1.0.2",
   "groupId": "167d12fd-a524-4ceb-9804-cb9e9ac3cdc3",
   "assetId": "salesforce-customers-system-api",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "apiVersion": "v1",
   "tags": []
 }

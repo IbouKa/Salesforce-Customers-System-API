@@ -45,3 +45,8 @@ Thumbs.db
 # Exchange (generated files that interfere with independent builds)
 .exchange.xml
 .exchange_modules_tmp/
+
+src/test/*
+/bin/
+
+src/main/resources/config.properties
