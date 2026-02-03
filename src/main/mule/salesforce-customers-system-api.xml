@@ -70,7 +70,7 @@ var sfId = payload.id default null
     (Id: sfId) if sfId != null,
     (SourceSystemIdentifier: payload.globalId) if payload.globalId != null,
     AccountNumber: payload.customerNumber default null,
-    Name: (party.firstName default "") ++ " " ++ (party.lastName default ""),
+  //  Name: (party.firstName default "") ++ " " ++ //(party.lastName default ""),
     FirstName: party.firstName default null,
     LastName: party.lastName default null,
     taxId__c: party.taxId default null,
