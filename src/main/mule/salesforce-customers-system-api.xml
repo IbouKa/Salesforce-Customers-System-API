@@ -10,7 +10,7 @@ output application/java
 var sfId = payload.sfId default null
 ---
 {
-  query: "SELECT Id,SourceSystemIdentifier, FirstName,LastName,Type,taxId__c,Status__c FROM Account where RecordType.Name ='Person Account' " ++ 
+  query: "SELECT Id,SourceSystemIdentifier,AccountNumber,FirstName,LastName,Type,taxId__c,Status__c FROM Account where RecordType.Name ='Person Account' " ++ 
          (if (sfId != null) "and Id = '" ++ sfId ++ "' " else "")
 }]]>
         </ee:set-payload>
@@ -151,7 +151,7 @@ output application/java
 var sfId = attributes.uriParams.sfId default null
 ---
 {
-  query: "SELECT Id,SourceSystemIdentifier, FirstName,LastName,Type,taxId__c,Status__c FROM Account where RecordType.Name ='Person Account' " ++ 
+  query: "SELECT Id,SourceSystemIdentifier,AccountNumber,FirstName,LastName,Type,taxId__c,Status__c FROM Account where RecordType.Name ='Person Account' " ++ 
          (if (sfId != null) "and Id = '" ++ sfId ++ "' " else "")
 }]]>
         </ee:set-payload>

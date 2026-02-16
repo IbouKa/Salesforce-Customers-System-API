@@ -112,6 +112,44 @@ output application/json
         </ee:transform>
         <set-variable value="405" doc:name="httpStatus" doc:id="d3d4a356-1b30-4ea3-bf48-82e66c597694" variableName="httpStatus" />
       </on-error-propagate>
+      <on-error-propagate type="APIKIT:METHOD_NOT_ALLOWED" enableNotifications="true" logException="true" doc:name="On Error Propagate">
+        <ee:transform doc:name="Transform Error Response">
+          <ee:message>
+            <ee:set-payload>
+              <![CDATA[%dw 2.0
+      output application/json
+      ---
+      {
+        error: {
+          code: "CONNECTION FAILED",
+          message: "connection failed",
+          timestamp: now()
+        }
+      }]]>
+            </ee:set-payload>
+          </ee:message>
+        </ee:transform>
+        <set-variable value="405" doc:name="httpStatus" doc:id="typfvv" variableName="httpStatus" />
+      </on-error-propagate>
+      <on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="efb3cc6e-3226-4879-80e0-f2d57a94b743" type="SALESFORCE:INVALID_INPUT">
+        <ee:transform doc:name="Transform Message" doc:id="215fe9cb-1de6-4c7b-b7d2-76332133fcf1">
+          <ee:message>
+            <ee:set-payload>
+              <![CDATA[%dw 2.0
+output application/json
+---
+{
+  error: {
+    code: "400 Bad Request",
+    message: error.description,
+    timestamp: now()
+  }
+}]]>
+            </ee:set-payload>
+          </ee:message>
+        </ee:transform>
+        <set-variable value="400" doc:name="httpStatus" doc:id="ff90e805-5a12-4fbd-8af0-b0dc77d4dd54" variableName="httpStatus" />
+      </on-error-continue>
     </error-handler>
   </flow>
   <!-- GET /customers -->
@@ -251,6 +289,25 @@ output application/json
         </ee:transform>
         <set-variable value="405" doc:name="httpStatus" doc:id="ec11a765-caf6-4e83-a156-e5f3ac086137" variableName="httpStatus" />
       </on-error-propagate>
+      <on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="efb3cc6e-3226-4879-80e0-f2d57a94b743" type="SALESFORCE:INVALID_INPUT">
+        <ee:transform doc:name="Transform Message" doc:id="215fe9cb-1de6-4c7b-b7d2-76332133fcf1">
+          <ee:message>
+            <ee:set-payload>
+              <![CDATA[%dw 2.0
+output application/json
+---
+{
+  error: {
+    code: "400 Bad Request",
+    message: error.description,
+    timestamp: now()
+  }
+}]]>
+            </ee:set-payload>
+          </ee:message>
+        </ee:transform>
+        <set-variable value="400" doc:name="httpStatus" doc:id="ff90e805-5a12-4fbd-8af0-b0dc77d4dd54" variableName="httpStatus" />
+      </on-error-continue>
     </error-handler>
   </flow>
 </mule>
